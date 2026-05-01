@@ -1,0 +1,43 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+.venv/
+venv/
+env/
+
+# Build / dist
+dist/
+build/
+*.egg-info/
+.eggs/
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+
+# IDE & OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Local app data (SQLite, uploaded kubeconfigs)
+data/
+
+# Logs & coverage
+*.log
+.coverage
+htmlcov/
+.pytest_cache/
+coverage/
+
+# Vite / frontend
+*.local
+
+# Binaries / merge junk (k8sgpt is installed in backend Docker image)
+frontend/k8sgpt
+*.mine

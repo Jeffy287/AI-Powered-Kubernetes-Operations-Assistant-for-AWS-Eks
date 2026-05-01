@@ -1,0 +1,35 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      args:
+        # Pin or bump: https://github.com/k8sgpt-ai/k8sgpt/releases
+        K8SGPT_VERSION: v0.4.32
+    container_name: eks-assistant-api
+    environment:
+      EKS_ASSISTANT_API_PREFIX: /api/v1
+      EKS_ASSISTANT_DATA_DIR: /app/data
+      # Used when the browser hits the API on a different origin than the SPA
+      EKS_ASSISTANT_CORS_ORIGINS: "http://localhost,http://127.0.0.1,http://localhost:8080,http://127.0.0.1:8080,http://localhost:5173,http://127.0.0.1:5173,http://localhost:8000,http://127.0.0.1:8000"
+    volumes:
+      - eks-assistant-data:/app/data
+    ports:
+      - "8000:8000"
+    # Uncomment to use host kubeconfig (read-only). EKS exec auth often needs AWS CLI + creds on PATH—mount or bake into an extended image.
+    # volumes:
+    #   - ${HOME}/.kube:/root/.kube:ro
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: eks-assistant-web
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "8080:80"
+
+volumes:
+  eks-assistant-data:
