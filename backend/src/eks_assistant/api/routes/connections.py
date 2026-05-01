@@ -9,6 +9,10 @@ from pathlib import Path
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
 from eks_assistant.api.deps import DbSessionDep, TenantIdDep
+from eks_assistant.api.schemas.connection_bootstrap import (
+    TokenKubeconfigRequest,
+    render_kubeconfig_token_auth,
+)
 from eks_assistant.core.config import get_settings
 from eks_assistant.db.models import ClusterConnection, TenantPreference
 from eks_assistant.services import kubernetes_service
@@ -98,6 +102,51 @@ async def create_connection(
         "display_name": row.display_name,
         "context_name": row.context_name,
         "message": "Connection saved. Activate it and run Test to validate credentials.",
+    }
+
+
+@router.post(
+    "/bootstrap-token",
+    summary="Create connection from API URL + CA + bearer token (JSON body)",
+    status_code=status.HTTP_201_CREATED,
+)
+async def bootstrap_token(
+    body: TokenKubeconfigRequest,
+    session: DbSessionDep,
+    tenant_id: TenantIdDep,
+) -> dict:
+    text = render_kubeconfig_token_auth(body)
+    raw = text.encode("utf-8")
+    if len(raw) > MAX_KUBECONFIG_BYTES:
+        raise HTTPException(
+            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="generated kubeconfig too large",
+        )
+
+    conn_id = str(uuid.uuid4())
+    rel = f"kubeconfigs/{conn_id}/config"
+    data = _data_dir()
+    dest = data / rel
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_bytes(raw)
+
+    ctx_name = body.context_name.strip()
+    row = ClusterConnection(
+        id=conn_id,
+        tenant_id=tenant_id,
+        display_name=body.display_name.strip(),
+        kubeconfig_rel_path=rel,
+        context_name=ctx_name,
+    )
+    session.add(row)
+    await session.commit()
+    await session.refresh(row)
+
+    return {
+        "id": row.id,
+        "display_name": row.display_name,
+        "context_name": row.context_name,
+        "message": "Connection saved from token. Activate and test.",
     }
 
 

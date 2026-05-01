@@ -12,6 +12,15 @@ services:
       EKS_ASSISTANT_DATA_DIR: /app/data
       # Used when the browser hits the API on a different origin than the SPA
       EKS_ASSISTANT_CORS_ORIGINS: "http://localhost,http://127.0.0.1,http://localhost:8080,http://127.0.0.1:8080,http://localhost:5173,http://127.0.0.1:5173,http://localhost:8000,http://127.0.0.1:8000"
+      # Optional: enables K8sGPT `--explain` when provider auth is configured (see k8sgpt auth add)
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      # Amazon Bedrock — use inference profile id from Bedrock console (e.g. us.anthropic.claude-sonnet-4-6-...)
+      EKS_ASSISTANT_BEDROCK_MODEL_ID: ${EKS_ASSISTANT_BEDROCK_MODEL_ID:-}
+      EKS_ASSISTANT_BEDROCK_REGION: ${EKS_ASSISTANT_BEDROCK_REGION:-us-east-1}
+      # AWS credentials for boto3 (omit on EC2/ECS/EKS with instance/task role)
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
     volumes:
       - eks-assistant-data:/app/data
     ports:

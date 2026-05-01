@@ -86,14 +86,14 @@ export function IncidentsPage() {
   return (
     <div className="dashboard">
       <section className="panel panel--highlight">
-        <h2 className="panel__title">📋 Incident Memory (Keyword Recall)</h2>
+        <h2 className="panel__title">Incident memory</h2>
         <p className="muted small-print">
           Store and retrieve K8sGPT analysis snapshots for your workspace. Search uses keyword matching for quick incident recall. Future versions will support vector embeddings for semantic search.
         </p>
       </section>
 
       <section className="panel">
-        <h2 className="panel__title">💾 Save K8sGPT Analysis</h2>
+        <h2 className="panel__title">Save analysis</h2>
         <label className="field">
           <span className="field__label">Note (Optional)</span>
           <input
@@ -104,17 +104,17 @@ export function IncidentsPage() {
           />
         </label>
         <button type="button" className="btn" onClick={() => void saveAnalysis()}>
-          {lastK8sGPT ? "💾 Save Analysis" : "⚠️ No Analysis to Save"}
+          {lastK8sGPT ? "Save analysis" : "No analysis in session"}
         </button>
         {lastK8sGPT == null && (
           <p className="muted small-print" style={{ marginTop: "0.75rem" }}>
-            📊 No analysis in session — run <strong>Analyze</strong> on the Overview tab first.
+            Run <strong>analysis</strong> on the Home page first.
           </p>
         )}
       </section>
 
       <section className="panel">
-        <h2 className="panel__title">🔍 Search Incidents</h2>
+        <h2 className="panel__title">Search</h2>
         <div className="k8sgpt-controls">
           <input
             className="field__input"
@@ -124,33 +124,33 @@ export function IncidentsPage() {
             placeholder="e.g., CrashLoopBackOff, prometheus, OOMKilled"
           />
           <button type="button" className="btn" onClick={() => void search()}>
-            🔍 Search
+            Search
           </button>
           <button
             type="button"
             className="btn btn--secondary"
             onClick={() => void loadRecent()}
           >
-            📅 Recent
+            Recent
           </button>
         </div>
       </section>
 
-      {msg && <p className="diagnostics-copy" style={{ color: "var(--accent)", fontWeight: 600 }}>ℹ️ {msg}</p>}
-      {error && <p className="error">❌ {error}</p>}
+      {msg && <p className="diagnostics-copy diagnostics-copy--accent">{msg}</p>}
+      {error && <p className="error">{error}</p>}
 
       <section className="panel">
-        <h2 className="panel__title">📊 Results ({items.length})</h2>
+        <h2 className="panel__title">Results ({items.length})</h2>
         <ul className="conn-list">
           {items.length === 0 ? (
             <li style={{ textAlign: "center", padding: "2rem", color: "var(--muted)" }}>
-              📭 No incidents found. Try a different search or run an analysis.
+              No incidents found. Try another search or save an analysis first.
             </li>
           ) : (
             items.map((it) => (
               <li key={it.id} className="conn-list__item">
                 <div>
-                  <strong>📌 {it.title}</strong>
+                  <strong>{it.title}</strong>
                   <div className="muted small-print mono">
                     ID: {it.id} · {it.created_at}
                   </div>
@@ -163,7 +163,7 @@ export function IncidentsPage() {
                   className="btn btn--small btn--secondary"
                   onClick={() => void openDetail(it.id)}
                 >
-                  👁️ View
+                  View
                 </button>
               </li>
             ))
@@ -173,7 +173,7 @@ export function IncidentsPage() {
 
       {detailBody && selected && (
         <section className="panel">
-          <h2 className="panel__title">📄 {selected.title}</h2>
+          <h2 className="panel__title">{selected.title}</h2>
           <pre className="k8sgpt-pre k8sgpt-pre--scroll">{detailBody}</pre>
           <button
             type="button"
@@ -183,7 +183,7 @@ export function IncidentsPage() {
               setSelected(null);
             }}
           >
-            ✕ Close
+            Close
           </button>
         </section>
       )}

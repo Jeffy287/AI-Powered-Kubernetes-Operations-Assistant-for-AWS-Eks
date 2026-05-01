@@ -89,6 +89,11 @@ async def k8sgpt_analyze(
             status_code=status.HTTP_504_GATEWAY_TIMEOUT,
             detail="k8sgpt analyze timed out",
         ) from e
+    except k8sgpt_runner.K8sGPTExplainUnavailableError as e:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(e),
+        ) from e
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,

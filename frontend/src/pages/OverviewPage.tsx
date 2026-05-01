@@ -5,7 +5,6 @@ import { useAnalysis } from "../context/AnalysisContext";
 import { useTenant } from "../context/TenantContext";
 
 type HealthResponse = { status: string };
-type DiagnosticsSummary = Record<string, unknown>;
 type K8sGPTVersionResponse = {
   installed: boolean;
   binary: string;
@@ -20,26 +19,34 @@ type K8sGPTAnalyzeResponse = {
   result: unknown;
 };
 
+type Diagnostics = {
+  connected?: boolean;
+  message?: string;
+  error?: string;
+  kubernetes?: Record<string, string>;
+  namespaces?: number;
+  pods_total?: number;
+  pods_not_healthy?: number;
+};
+
 export function OverviewPage() {
-  const { tenantId } = useTenant();
+  const { tenantId, setTenantId } = useTenant();
   const { setLastK8sGPT } = useAnalysis();
   const [health, setHealth] = useState<HealthResponse | null>(null);
-  const [diagnostics, setDiagnostics] = useState<DiagnosticsSummary | null>(null);
+  const [diagnostics, setDiagnostics] = useState<Diagnostics | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [wsCount, setWsCount] = useState<number | null>(null);
 
-  const [k8sgptVersion, setK8sgptVersion] = useState<K8sGPTVersionResponse | null>(
-    null,
-  );
+  const [k8sgptVersion, setK8sgptVersion] = useState<K8sGPTVersionResponse | null>(null);
   const [k8sgptVersionError, setK8sgptVersionError] = useState<string | null>(null);
 
   const [namespace, setNamespace] = useState("");
+  const [namespaceOptions, setNamespaceOptions] = useState<string[]>([]);
   const [explain, setExplain] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
-  const [analyzeResult, setAnalyzeResult] = useState<K8sGPTAnalyzeResponse | null>(
-    null,
-  );
+  const [analyzeResult, setAnalyzeResult] = useState<K8sGPTAnalyzeResponse | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -47,7 +54,7 @@ export function OverviewPage() {
     try {
       const [h, d] = await Promise.all([
         getJson<HealthResponse>("/health"),
-        getJson<DiagnosticsSummary>("/diagnostics/summary"),
+        getJson<Diagnostics>("/diagnostics/summary"),
       ]);
       setHealth(h);
       setDiagnostics(d);
@@ -67,19 +74,30 @@ export function OverviewPage() {
   }, [refresh, tenantId]);
 
   useEffect(() => {
+    let c = false;
+    (async () => {
+      try {
+        const w = await getJson<{ items: { id: string }[] }>("/workspaces");
+        if (!c) setWsCount(w.items.length);
+      } catch {
+        if (!c) setWsCount(null);
+      }
+    })();
+    return () => {
+      c = true;
+    };
+  }, [tenantId]);
+
+  useEffect(() => {
     let cancelled = false;
     (async () => {
       setK8sgptVersionError(null);
       try {
-        const v = await getJson<K8sGPTVersionResponse>(
-          "/diagnostics/k8sgpt/version",
-        );
+        const v = await getJson<K8sGPTVersionResponse>("/diagnostics/k8sgpt/version");
         if (!cancelled) setK8sgptVersion(v);
       } catch (e) {
         if (!cancelled) {
-          setK8sgptVersionError(
-            e instanceof ApiError ? e.message : "Could not check K8sGPT.",
-          );
+          setK8sgptVersionError(e instanceof ApiError ? e.message : "K8sGPT check failed.");
           setK8sgptVersion(null);
         }
       }
@@ -89,96 +107,162 @@ export function OverviewPage() {
     };
   }, [tenantId]);
 
+  useEffect(() => {
+    if (!diagnostics?.connected) {
+      setNamespaceOptions([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await getJson<{ items: { name: string }[] }>("/cluster/namespaces");
+        if (!cancelled) {
+          setNamespaceOptions(r.items.map((x) => x.name).sort());
+        }
+      } catch {
+        if (!cancelled) setNamespaceOptions([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [diagnostics?.connected, tenantId]);
+
   const runK8sGPTAnalyze = useCallback(async () => {
     setAnalyzing(true);
     setAnalyzeError(null);
     setAnalyzeResult(null);
     try {
       const ns = namespace.trim();
-      const out = await postJson<K8sGPTAnalyzeResponse>(
-        "/diagnostics/k8sgpt/analyze",
-        {
-          namespace: ns.length > 0 ? ns : null,
-          explain,
-          filters: null,
-        },
-      );
+      const out = await postJson<K8sGPTAnalyzeResponse>("/diagnostics/k8sgpt/analyze", {
+        namespace: ns.length > 0 ? ns : null,
+        explain,
+        filters: null,
+      });
       setAnalyzeResult(out);
       setLastK8sGPT(out.result);
       void refresh();
     } catch (e) {
       const msg =
-        e instanceof ApiError
-          ? `${e.message} (${e.status})`
-          : String(e);
+        e instanceof ApiError ? `${e.message} (${e.status})` : String(e);
       setAnalyzeError(msg);
     } finally {
       setAnalyzing(false);
     }
   }, [explain, namespace, refresh, setLastK8sGPT]);
 
+  const connected = diagnostics?.connected === true;
+
   return (
-    <div className="dashboard">
+    <div className="dashboard landing">
       <section className="panel panel--highlight">
-        <h2 className="panel__title">🚀 Getting Started</h2>
-        <p className="muted small-print" style={{ marginBottom: "0.75rem" }}>
-          Welcome! Start by connecting your Kubernetes cluster. Visit <NavLink to="/connect" className="link">🔗 Connect</NavLink> to upload your kubeconfig file. Each workspace (tenant) operates independently with isolated diagnostics, K8sGPT analysis, and incident memory.
+        <p className="landing__eyebrow">Home</p>
+        <h2 className="landing__title">Dashboard</h2>
+        <p className="muted landing__lead">
+          Manage <NavLink to="/workspaces">workspaces</NavLink>, connect a cluster, then open{" "}
+          <NavLink to="/cluster">Cluster</NavLink> for workloads and nodes.
         </p>
       </section>
 
       <section className="panel">
-        <h2 className="panel__title">📊 API Status</h2>
-        {loading && <p className="muted">🔄 Loading…</p>}
-        {error && <p className="error">❌ {error}</p>}
+        <h3 className="panel__title">Workspace</h3>
+        <p className="muted small-print">
+          Active workspace ID (isolates connections and saved incidents).{" "}
+          {wsCount !== null && (
+            <span>
+              {wsCount} workspace{wsCount === 1 ? "" : "s"} registered.
+            </span>
+          )}
+        </p>
+        <label className="field landing__workspace-field">
+          <span className="field__label">Workspace ID</span>
+          <input
+            className="field__input field__input--lg"
+            value={tenantId}
+            onChange={(e) => setTenantId(e.target.value)}
+            placeholder="e.g. team-alpha"
+            autoComplete="off"
+            spellCheck={false}
+          />
+        </label>
+        <NavLink to="/workspaces" className="btn btn--secondary">
+          Open workspace directory
+        </NavLink>
+      </section>
+
+      <section className="panel">
+        <h3 className="panel__title">Service status</h3>
+        {loading && <p className="muted">Loading…</p>}
+        {error && <p className="error">{error}</p>}
         {!loading && !error && health && (
-          <p>
-            Backend health: 
-            <code className="badge badge--ok">✓ {health.status}</code>
+          <p className="landing__inline-status">
+            API <span className="badge badge--ok">{health.status}</span>
           </p>
         )}
       </section>
 
       <section className="panel">
-        <h2 className="panel__title">🔍 Cluster Diagnostics</h2>
+        <h3 className="panel__title">Cluster snapshot</h3>
         {!loading && diagnostics && (
-          <pre className="k8sgpt-pre k8sgpt-pre--scroll">
-            {JSON.stringify(diagnostics, null, 2)}
-          </pre>
+          <div className="stat-grid">
+            {!connected && (
+              <p className="muted">
+                {diagnostics.message ?? "No connection for this workspace."}
+              </p>
+            )}
+            {connected && diagnostics.error && <p className="error">{diagnostics.error}</p>}
+            {connected && !diagnostics.error && (
+              <>
+                <div className="stat-card">
+                  <span className="stat-card__label">Kubernetes</span>
+                  <span className="stat-card__value mono">
+                    {diagnostics.kubernetes?.git_version ?? "—"}
+                  </span>
+                </div>
+                <div className="stat-card">
+                  <span className="stat-card__label">Namespaces</span>
+                  <span className="stat-card__value">{diagnostics.namespaces ?? "—"}</span>
+                </div>
+                <div className="stat-card">
+                  <span className="stat-card__label">Pods</span>
+                  <span className="stat-card__value">{diagnostics.pods_total ?? "—"}</span>
+                </div>
+                <div className="stat-card stat-card--accent">
+                  <span className="stat-card__label">Attention</span>
+                  <span className="stat-card__value">{diagnostics.pods_not_healthy ?? "—"}</span>
+                  <span className="stat-card__hint muted small-print">{diagnostics.message}</span>
+                </div>
+              </>
+            )}
+          </div>
         )}
       </section>
 
       <section className="panel">
-        <h2 className="panel__title">🤖 K8sGPT Analysis</h2>
+        <h3 className="panel__title">K8sGPT</h3>
         <p className="muted small-print">
-          Uses your active kubeconfig for intelligent cluster analysis. Enable <strong>Explain</strong> to get AI-powered insights (requires AI backend configured in K8sGPT).
+          Uses active kubeconfig. Explain requires AI backend in the API container.
         </p>
-        {k8sgptVersionError && (
-          <p className="error">❌ {k8sgptVersionError}</p>
-        )}
+        {k8sgptVersionError && <p className="error">{k8sgptVersionError}</p>}
         {k8sgptVersion && (
-          <div className="k8sgpt-meta">
-            <p>
-              <strong>CLI:</strong> <code className="mono">{k8sgptVersion.binary}</code>
-              {k8sgptVersion.kubeconfig_bound !== undefined && (
-                <span className="muted">
-                  {" "} · Kubeconfig: {k8sgptVersion.kubeconfig_bound ? "✓ Bound" : "📦 Default env"}
-                </span>
-              )}
-            </p>
-            <pre className="k8sgpt-pre">{k8sgptVersion.stdout}</pre>
-          </div>
+          <pre className="k8sgpt-pre k8sgpt-pre--compact">{k8sgptVersion.stdout}</pre>
         )}
-        <div className="k8sgpt-controls">
+        <div className="k8sgpt-controls k8sgpt-controls--wrap">
           <label className="field">
-            <span className="field__label">Namespace (optional)</span>
-            <input
+            <span className="field__label">Namespace</span>
+            <select
               className="field__input"
-              type="text"
-              placeholder="e.g. kube-system"
               value={namespace}
               onChange={(e) => setNamespace(e.target.value)}
-              autoComplete="off"
-            />
+              disabled={!connected || namespaceOptions.length === 0}
+            >
+              <option value="">All</option>
+              {namespaceOptions.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
           </label>
           <label className="field field--inline">
             <input
@@ -186,30 +270,25 @@ export function OverviewPage() {
               checked={explain}
               onChange={(e) => setExplain(e.target.checked)}
             />
-            <span>🧠 Explain with AI</span>
+            <span>Explain</span>
           </label>
           <button
             type="button"
             className="btn"
-            disabled={analyzing || Boolean(k8sgptVersionError)}
+            disabled={analyzing || Boolean(k8sgptVersionError) || !connected}
             onClick={() => void runK8sGPTAnalyze()}
           >
-            {analyzing ? "⏳ Running…" : "▶️ Analyze"}
+            {analyzing ? "Running…" : "Run"}
           </button>
           <NavLink to="/incidents" className="btn btn--ghost">
-            💾 Save to Memory →
+            Incidents
           </NavLink>
         </div>
-        {analyzeError && <p className="error">❌ {analyzeError}</p>}
+        {analyzeError && <p className="error">{analyzeError}</p>}
         {analyzeResult && (
-          <div className="k8sgpt-output">
-            {analyzeResult.stderr && (
-              <p className="muted small-print">📋 stderr: {analyzeResult.stderr}</p>
-            )}
-            <pre className="k8sgpt-pre k8sgpt-pre--scroll">
-              {JSON.stringify(analyzeResult.result, null, 2)}
-            </pre>
-          </div>
+          <pre className="k8sgpt-pre k8sgpt-pre--scroll">
+            {JSON.stringify(analyzeResult.result, null, 2)}
+          </pre>
         )}
       </section>
     </div>

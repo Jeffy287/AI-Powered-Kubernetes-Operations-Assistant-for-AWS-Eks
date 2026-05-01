@@ -47,16 +47,21 @@ function errorMessageFromText(text: string, statusText: string): string {
   return text.slice(0, 500) || fallback;
 }
 
-function tenantHeaders(extra?: HeadersInit): HeadersInit {
+export type TenantRequestOpts = {
+  /** Use this workspace/tenant for `X-Tenant-ID` (e.g. before React tenant context updates). */
+  tenantId?: string;
+};
+
+function tenantHeaders(extra?: HeadersInit, tenantIdOverride?: string): HeadersInit {
   return {
     ...extra,
-    "X-Tenant-ID": getTenantId(),
+    "X-Tenant-ID": tenantIdOverride ?? getTenantId(),
   };
 }
 
-export async function getJson<T>(path: string): Promise<T> {
+export async function getJson<T>(path: string, opts?: TenantRequestOpts): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
-    headers: tenantHeaders({ Accept: "application/json" }),
+    headers: tenantHeaders({ Accept: "application/json" }, opts?.tenantId),
   });
   const text = await res.text();
   if (!res.ok) {
@@ -68,13 +73,16 @@ export async function getJson<T>(path: string): Promise<T> {
   return JSON.parse(text) as T;
 }
 
-export async function postJson<T>(path: string, body: unknown): Promise<T> {
+export async function postJson<T>(path: string, body: unknown, opts?: TenantRequestOpts): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     method: "POST",
-    headers: tenantHeaders({
-      Accept: "application/json",
-      "Content-Type": "application/json",
-    }),
+    headers: tenantHeaders(
+      {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      opts?.tenantId,
+    ),
     body: JSON.stringify(body),
   });
   const text = await res.text();
@@ -87,10 +95,10 @@ export async function postJson<T>(path: string, body: unknown): Promise<T> {
   return JSON.parse(text) as T;
 }
 
-export async function postWithoutBody<T>(path: string): Promise<T> {
+export async function postWithoutBody<T>(path: string, opts?: TenantRequestOpts): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     method: "POST",
-    headers: tenantHeaders({ Accept: "application/json" }),
+    headers: tenantHeaders({ Accept: "application/json" }, opts?.tenantId),
   });
   const text = await res.text();
   if (!res.ok) {
@@ -102,13 +110,28 @@ export async function postWithoutBody<T>(path: string): Promise<T> {
   return JSON.parse(text) as T;
 }
 
-export async function postForm<T>(
+export async function deleteJson<T = Record<string, unknown>>(
   path: string,
-  form: FormData,
+  opts?: TenantRequestOpts,
 ): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
+    method: "DELETE",
+    headers: tenantHeaders({ Accept: "application/json" }, opts?.tenantId),
+  });
+  const text = await res.text();
+  if (!res.ok) {
+    throw new ApiError(errorMessageFromText(text, res.statusText), res.status);
+  }
+  if (!text) {
+    return {} as T;
+  }
+  return JSON.parse(text) as T;
+}
+
+export async function postForm<T>(path: string, form: FormData, opts?: TenantRequestOpts): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
     method: "POST",
-    headers: tenantHeaders({ Accept: "application/json" }),
+    headers: tenantHeaders({ Accept: "application/json" }, opts?.tenantId),
     body: form,
   });
   const text = await res.text();

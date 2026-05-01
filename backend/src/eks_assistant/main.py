@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from eks_assistant.api.routes import (
+    assistant,
     cluster,
     connections,
     diagnostics,
@@ -13,6 +14,7 @@ from eks_assistant.api.routes import (
     incidents,
     k8sgpt,
     remediation,
+    workspaces,
 )
 from eks_assistant.core.config import get_settings
 from eks_assistant.db.session import init_database, shutdown_database
@@ -47,7 +49,9 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(health.router, prefix=settings.api_prefix)
+    app.include_router(workspaces.router, prefix=settings.api_prefix)
     app.include_router(connections.router, prefix=settings.api_prefix)
+    app.include_router(assistant.router, prefix=settings.api_prefix)
     app.include_router(cluster.router, prefix=settings.api_prefix)
     app.include_router(diagnostics.router, prefix=settings.api_prefix)
     app.include_router(k8sgpt.router, prefix=settings.api_prefix)

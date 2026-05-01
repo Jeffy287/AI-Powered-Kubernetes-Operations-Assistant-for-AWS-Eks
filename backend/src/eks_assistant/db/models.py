@@ -15,6 +15,15 @@ class Base(DeclarativeBase):
     pass
 
 
+class Workspace(Base):
+    """Explicit workspace id (tenant) users can create before any cluster data exists."""
+
+    __tablename__ = "workspaces"
+
+    id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 class ClusterConnection(Base):
     __tablename__ = "cluster_connections"
 

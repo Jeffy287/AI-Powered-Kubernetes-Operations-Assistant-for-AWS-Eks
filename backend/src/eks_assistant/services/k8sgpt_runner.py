@@ -13,6 +13,10 @@ class K8sGPTNotInstalledError(FileNotFoundError):
     """Raised when the configured K8sGPT binary is not on PATH."""
 
 
+class K8sGPTExplainUnavailableError(RuntimeError):
+    """Explain mode produced no usable output (usually missing AI backend / auth)."""
+
+
 @dataclass(frozen=True)
 class K8sGPTVersionResult:
     exit_code: int
@@ -80,18 +84,38 @@ async def run_analyze(
         env=env,
     )
     out_b, err_b = await asyncio.wait_for(proc.communicate(), timeout=timeout)
-    stdout = out_b.decode(errors="replace")
+    stdout_raw = out_b.decode(errors="replace")
     stderr = err_b.decode(errors="replace").strip()
     exit_code = proc.returncode if proc.returncode is not None else -1
+    stdout = stdout_raw.strip()
 
-    parsed: dict[str, Any] | list[Any]
-    try:
-        parsed = json.loads(stdout) if stdout.strip() else {}
-    except json.JSONDecodeError as e:
+    if exit_code != 0:
         raise ValueError(
-            "K8sGPT did not return valid JSON on stdout. "
-            f"stderr: {stderr or '(empty)'}; parse error: {e}",
-        ) from e
+            f"k8sgpt analyze exited with status {exit_code}. stderr: {stderr or '(empty)'}",
+        )
+
+    if not stdout:
+        if explain:
+            raise K8sGPTExplainUnavailableError(
+                "K8sGPT returned no JSON output with --explain. "
+                "Configure an AI backend inside the container (e.g. "
+                "`k8sgpt auth add` with OPENAI_API_KEY / compatible provider, "
+                "set env vars the provider needs, then retry). "
+                "You can still run Analyze without “Explain with AI”.",
+            )
+        parsed: dict[str, Any] | list[Any] = []
+
+    else:
+        parsed = {}
+        try:
+            parsed = json.loads(stdout)
+        except json.JSONDecodeError as e:
+            preview = stdout[:400].replace("\n", "\\n")
+            raise ValueError(
+                "K8sGPT did not return valid JSON on stdout. "
+                f"stderr: {stderr or '(empty)'}; parse error: {e}; "
+                f"stdout preview: {preview!r}",
+            ) from e
 
     return K8sGPTAnalyzeResult(
         exit_code=exit_code,

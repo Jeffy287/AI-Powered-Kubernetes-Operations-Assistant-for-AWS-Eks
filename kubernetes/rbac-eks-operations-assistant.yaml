@@ -1,0 +1,53 @@
+# RBAC for EKS Operations Assistant (web UI kubeconfig)
+#
+# Grants the ServiceAccount used in your uploaded kubeconfig permission to:
+#   • Read Nodes (Compute / explorer)
+#   • List Services cluster-wide (Networking tab → list across all namespaces)
+#   • Read Pod logs (Pods → Logs)
+#
+# Apply:
+#   kubectl apply -f rbac-eks-operations-assistant.yaml
+#
+# Verify (replace SA name/namespace if you changed subjects):
+#   kubectl auth can-i get nodes --as=system:serviceaccount:default:app-sa
+#   kubectl auth can-i list nodes --as=system:serviceaccount:default:app-sa
+#   kubectl auth can-i get pods/log --as=system:serviceaccount:default:app-sa -n kube-system
+#   kubectl auth can-i list services --as=system:serviceaccount:default:app-sa
+#
+# Customize only the `subjects` block if your ServiceAccount is not default/app-sa.
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: eks-operations-assistant-extended
+  labels:
+    app.kubernetes.io/name: eks-operations-assistant
+rules:
+  # Nodes — cluster-scoped; required for Nodes tab and describing the node a pod runs on.
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "watch"]
+  # Services — cluster-scoped list (Networking tab uses list_service_for_all_namespaces).
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get", "list", "watch"]
+  # Pod logs — namespaced subresource; ClusterRole + ClusterRoleBinding allows logs in all namespaces
+  # (matches UI “All namespaces” and system namespaces like kube-system).
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: eks-operations-assistant-extended
+  labels:
+    app.kubernetes.io/name: eks-operations-assistant
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: eks-operations-assistant-extended
+subjects:
+  - kind: ServiceAccount
+    name: app-sa
+    namespace: default

@@ -25,6 +25,12 @@ class Settings(BaseSettings):
     #: When true, POST /remediation/execute may run allow-listed kubectl (use with extreme care)
     remediation_enabled: bool = False
 
+    #: Amazon Bedrock — inference profile or model id (e.g. us.anthropic.claude-sonnet-4-6-...)
+    #: Leave empty to disable POST /assistant/explain.
+    bedrock_model_id: str = ""
+    #: Region for Bedrock Runtime client (defaults to common Bedrock regions)
+    bedrock_region: str = "us-east-1"
+
 
 @lru_cache
 def get_settings() -> Settings:
