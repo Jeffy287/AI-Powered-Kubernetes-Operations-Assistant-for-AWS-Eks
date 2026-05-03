@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ApiError, getJson, postWithoutBody } from "../api/http-client";
 import { useTenant } from "../context/TenantContext";
+import { WorkspaceAssistantPanel } from "./WorkspaceAssistantPanel";
 
 type ConnectionRow = {
   id: string;
@@ -110,6 +111,10 @@ export function WorkspaceLayout() {
           </div>
         </div>
 
+        <NavLink to="/" className="app-sidebar__back app-sidebar__back--top">
+          ← All workspaces
+        </NavLink>
+
         <div className="app-sidebar__section">
           <label className="app-sidebar__label">Workspace</label>
           <p className="app-sidebar__workspace-readonly mono">{workspaceId || "—"}</p>
@@ -119,9 +124,20 @@ export function WorkspaceLayout() {
         </div>
 
         <div className="app-sidebar__section">
-          <label className="app-sidebar__label" htmlFor="sidebar-cluster-select">
-            Active cluster
-          </label>
+          <div className="app-sidebar__row-label">
+            <label className="app-sidebar__label" htmlFor="sidebar-cluster-select">
+              Active cluster
+            </label>
+            <button
+              type="button"
+              className="btn btn--secondary btn--small"
+              disabled={connLoading || clusterSwitching || !workspaceId}
+              aria-label="Reload saved connections from server"
+              onClick={() => void loadConnections()}
+            >
+              Refresh
+            </button>
+          </div>
           <select
             id="sidebar-cluster-select"
             className="app-sidebar__workspace-input"
@@ -162,10 +178,6 @@ export function WorkspaceLayout() {
           )}
         </div>
 
-        <NavLink to="/" className="app-sidebar__back">
-          ← All workspaces
-        </NavLink>
-
         <nav className="app-sidebar__nav" aria-label="Primary">
           <NavLink
             to={`${base}/connect`}
@@ -198,6 +210,7 @@ export function WorkspaceLayout() {
       </aside>
 
       <div className="app-shell__content">
+        <WorkspaceAssistantPanel />
         <Outlet />
       </div>
     </div>

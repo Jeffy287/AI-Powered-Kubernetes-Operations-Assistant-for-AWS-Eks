@@ -11,7 +11,7 @@ class PodTarget(BaseModel):
 
 
 class ExplainRequest(BaseModel):
-    """At least one target field should be set so the model has context."""
+    """Pod/node/extra_context give cluster signal; question alone is allowed for general Q&A."""
 
     question: str | None = Field(None, max_length=8000)
     pod: PodTarget | None = None
@@ -19,13 +19,14 @@ class ExplainRequest(BaseModel):
     extra_context: str | None = Field(None, max_length=48000)
 
     @model_validator(mode="after")
-    def at_least_one_target(self) -> ExplainRequest:
+    def at_least_one_signal(self) -> ExplainRequest:
         has_pod = self.pod is not None
         has_node = bool(self.node_name and self.node_name.strip())
         has_extra = bool(self.extra_context and self.extra_context.strip())
-        if not has_pod and not has_node and not has_extra:
+        has_question = bool(self.question and self.question.strip())
+        if not has_pod and not has_node and not has_extra and not has_question:
             raise ValueError(
-                "Provide at least one of: pod, node_name, or extra_context",
+                "Provide a question and/or one of: pod, node_name, extra_context",
             )
         return self
 
